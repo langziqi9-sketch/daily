@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>恰恰 · 每日低消耗记录</title>
+
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC";
+    background: #f2f6fb;
+    color: #1f2d3d;
+    padding: 14px;
+  }
+
+  h1 {
+    font-size: 18px;
+    color: #2f6fe4;
+    margin-bottom: 4px;
+  }
+
+  .date {
+    font-size: 14px;
+    color: #6b8fd6;
+    margin-bottom: 14px;
+  }
+
+  .container {
+    display: flex;
+    gap: 12px;
+  }
+
+  .column {
+    flex: 1;
+    background: #fff;
+    border-radius: 14px;
+    padding: 12px;
+    box-shadow: 0 2px 6px rgba(47, 111, 228, 0.06);
+  }
+
+  .column h2 {
+    font-size: 15px;
+    color: #2f6fe4;
+    margin-bottom: 10px;
+  }
+
+  ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  li {
+    display: flex;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+
+  input[type="checkbox"] {
+    margin-right: 8px;
+    transform: scale(1.2);
+  }
+
+  input[type="text"] {
+    flex: 1;
+    border: none;
+    border-bottom: 1px solid #d6e2f5;
+    font-size: 14px;
+    padding: 4px;
+  }
+
+  input[type="text"]:focus {
+    outline: none;
+    border-bottom-color: #2f6fe4;
+  }
+
+  .note {
+    margin-top: 14px;
+    background: #fff;
+    padding: 12px;
+    border-radius: 14px;
+    box-shadow: 0 2px 6px rgba(47, 111, 228, 0.06);
+  }
+
+  textarea {
+    width: 100%;
+    border: 1px solid #d6e2f5;
+    border-radius: 10px;
+    padding: 8px;
+    font-size: 14px;
+    resize: none;
+  }
+
+  textarea:focus {
+    outline: none;
+    border-color: #2f6fe4;
+  }
+
+  .hint {
+    font-size: 12px;
+    color: #8aa4d8;
+    margin-top: 4px;
+  }
+</style>
+</head>
+
+<body>
+  <h1>🌱 恰恰 · 每日低消耗记录</h1>
+  <div class="date" id="today"></div>
+
+  <div class="container">
+    <!-- 早上 -->
+    <div class="column">
+      <h2>☀️ 早上｜我想做的事</h2>
+      <ul id="morningList"></ul>
+      <div class="hint">这是意图，不是承诺</div>
+    </div>
+
+    <!-- 晚上 -->
+    <div class="column">
+      <h2>🌙 晚上｜我实际完成了</h2>
+      <ul id="eveningList"></ul>
+      <div class="hint">完成的才勾，不做评价</div>
+    </div>
+  </div>
+
+  <div class="note">
+    <h2>🧠 今日能量 / 状态备注（可选）</h2>
+    <textarea id="note" rows="2" placeholder="例如：偏累 / 情绪起伏"></textarea>
+  </div>
+
+<script>
+  const today = new Date();
+  const key = "daily-" + today.toISOString().slice(0,10);
+
+  document.getElementById("today").innerText =
+    today.toLocaleDateString("zh-CN", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      weekday: "long"
+    });
+
+  const defaultTasks = ["", "", "", ""];
+  const data = JSON.parse(localStorage.getItem(key)) || {
+    tasks: defaultTasks,
+    done: [false, false, false, false],
+    note: ""
+  };
+
+  const morningList = document.getElementById("morningList");
+  const eveningList = document.getElementById("eveningList");
+
+  function save() {
+    localStorage.setItem(key, JSON.stringify(data));
+  }
+
+  // 创建并保存所有晚上列表输入框的引用
+  const eveningInputs = [];
+
+  data.tasks.forEach((text, i) => {
+    // 早上输入
+    const liM = document.createElement("li");
+    const textInput = document.createElement("input");
+    textInput.type = "text";
+    textInput.value = text;
+    textInput.placeholder = "待办事项";
+
+    // 晚上勾选
+    const liE = document.createElement("li");
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = data.done[i];
+    checkbox.onchange = e => {
+      data.done[i] = e.target.checked;
+      save();
+    };
+
+    const eveningText = document.createElement("input");
+    eveningText.type = "text";
+    eveningText.value = text;
+    eveningText.disabled = true;
+
+    // 先保存晚上输入框的引用
+    eveningInputs.push(eveningText);
+
+    // 然后再定义早上输入框的事件处理器，这样可以安全地引用 eveningText
+    textInput.oninput = e => {
+      data.tasks[i] = e.target.value;
+      save();
+      eveningText.value = e.target.value;
+    };
+
+    liM.appendChild(textInput);
+    morningList.appendChild(liM);
+
+    liE.appendChild(checkbox);
+    liE.appendChild(eveningText);
+    eveningList.appendChild(liE);
+  });
+
+  const note = document.getElementById("note");
+  note.value = data.note;
+  note.oninput = e => {
+    data.note = e.target.value;
+    save();
+  };
+</script>
+</body>
+</html>
