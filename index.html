@@ -53,7 +53,8 @@
   li {
     display: flex;
     align-items: center;
-    margin-bottom: 8px;
+    margin-bottom: 16px;
+    gap: 10px;
   }
 
   input[type="checkbox"] {
@@ -66,7 +67,9 @@
     border: none;
     border-bottom: 1px solid #d6e2f5;
     font-size: 14px;
-    padding: 4px;
+    padding: 8px 6px;
+    background: rgba(47,111,228,0.02);
+    border-radius: 6px;
   }
 
   input[type="text"]:focus {
@@ -101,12 +104,54 @@
     color: #8aa4d8;
     margin-top: 4px;
   }
+
+  /* Unified controls style */
+  input[type="date"], select, button {
+    font-size: 14px;
+    padding: 6px 10px;
+    border-radius: 10px;
+    border: 1px solid #d6e2f5;
+    background: #fff;
+    color: #1f2d3d;
+    box-shadow: none;
+    transition: all .12s ease;
+  }
+
+  input[type="date"] {
+    border-radius: 8px;
+    padding: 6px 8px;
+  }
+
+  select {
+    min-width: 160px;
+  }
+
+  button {
+    cursor: pointer;
+    background: #2f6fe4;
+    color: #fff;
+    border: 1px solid rgba(47,111,228,0.12);
+  }
+
+  button:hover {
+    filter: brightness(.96);
+  }
+
+  /* Header controls layout */
+  .date + input[type="date"] { margin-left: 6px; }
+  #savedDates { margin-left: 8px; }
 </style>
 </head>
 
 <body>
   <h1>🌱 恰恰 · 每日低消耗记录</h1>
-  <div class="date" id="today"></div>
+  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+    <div class="date" id="today"></div>
+    <input type="date" id="datePicker" />
+    <button id="prevDay">◀ 上一日</button>
+    <button id="nextDay">下一日 ▶</button>
+    <select id="savedDates" title="已保存的日期"></select>
+  </div>
 
   <div class="container">
     <!-- 早上 -->
@@ -130,81 +175,145 @@
   </div>
 
 <script>
-  const today = new Date();
-  const key = "daily-" + today.toISOString().slice(0,10);
+  // Utility
+  function formatDate(d) {
+    return d.toISOString().slice(0,10);
+  }
 
-  document.getElementById("today").innerText =
-    today.toLocaleDateString("zh-CN", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      weekday: "long"
-    });
-
-  const defaultTasks = ["", "", "", ""];
-  const data = JSON.parse(localStorage.getItem(key)) || {
-    tasks: defaultTasks,
-    done: [false, false, false, false],
-    note: ""
-  };
+  // Elements
+  const todayEl = document.getElementById("today");
+  const datePicker = document.getElementById("datePicker");
+  const prevDayBtn = document.getElementById("prevDay");
+  const nextDayBtn = document.getElementById("nextDay");
+  const savedDatesSelect = document.getElementById("savedDates");
 
   const morningList = document.getElementById("morningList");
   const eveningList = document.getElementById("eveningList");
+  const note = document.getElementById("note");
 
-  function save() {
-    localStorage.setItem(key, JSON.stringify(data));
+  const defaultTasks = ["", "", "", ""];
+
+  let currentDate = new Date();
+  let data = null; // will hold loaded data for currentDate
+
+  function keyForDate(dateStr) {
+    return 'daily-' + dateStr;
   }
 
-  // 创建并保存所有晚上列表输入框的引用
-  const eveningInputs = [];
+  function renderHeader(dateObj) {
+    todayEl.innerText = dateObj.toLocaleDateString('zh-CN', { year:'numeric', month:'long', day:'numeric', weekday:'long' });
+    datePicker.value = formatDate(dateObj);
+  }
 
-  data.tasks.forEach((text, i) => {
-    // 早上输入
-    const liM = document.createElement("li");
-    const textInput = document.createElement("input");
-    textInput.type = "text";
-    textInput.value = text;
-    textInput.placeholder = "待办事项";
+  function save() {
+    const k = keyForDate(formatDate(currentDate));
+    localStorage.setItem(k, JSON.stringify(data));
+    refreshSavedDates();
+  }
 
-    // 晚上勾选
-    const liE = document.createElement("li");
-    const checkbox = document.createElement("input");
-    checkbox.type = "checkbox";
-    checkbox.checked = data.done[i];
-    checkbox.onchange = e => {
-      data.done[i] = e.target.checked;
+  function loadDataFor(dateObj) {
+    currentDate = new Date(dateObj);
+    const k = keyForDate(formatDate(currentDate));
+    const raw = localStorage.getItem(k);
+    data = raw ? JSON.parse(raw) : { tasks: [...defaultTasks], done: [false,false,false,false], note: '' };
+    renderHeader(currentDate);
+    renderLists();
+  }
+
+  function renderLists() {
+    morningList.innerHTML = '';
+    eveningList.innerHTML = '';
+    const eveningInputs = [];
+
+    data.tasks.forEach((text, i) => {
+      const liM = document.createElement('li');
+      const textInput = document.createElement('input');
+      textInput.type = 'text';
+      textInput.value = text;
+      textInput.placeholder = '待办事项';
+      textInput.oninput = e => {
+        data.tasks[i] = e.target.value;
+        save();
+        eveningInputs[i].value = e.target.value;
+      };
+      liM.appendChild(textInput);
+      morningList.appendChild(liM);
+
+      const liE = document.createElement('li');
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.checked = !!data.done[i];
+      checkbox.onchange = e => {
+        data.done[i] = e.target.checked;
+        save();
+      };
+      const eveningText = document.createElement('input');
+      eveningText.type = 'text';
+      eveningText.value = text;
+      eveningText.disabled = true;
+
+      eveningInputs.push(eveningText);
+
+      liE.appendChild(checkbox);
+      liE.appendChild(eveningText);
+      eveningList.appendChild(liE);
+    });
+
+    note.value = data.note || '';
+    note.oninput = e => {
+      data.note = e.target.value;
       save();
     };
+  }
 
-    const eveningText = document.createElement("input");
-    eveningText.type = "text";
-    eveningText.value = text;
-    eveningText.disabled = true;
+  function addDays(dateObj, delta) {
+    const d = new Date(dateObj);
+    d.setDate(d.getDate() + delta);
+    return d;
+  }
 
-    // 先保存晚上输入框的引用
-    eveningInputs.push(eveningText);
-
-    // 然后再定义早上输入框的事件处理器，这样可以安全地引用 eveningText
-    textInput.oninput = e => {
-      data.tasks[i] = e.target.value;
-      save();
-      eveningText.value = e.target.value;
-    };
-
-    liM.appendChild(textInput);
-    morningList.appendChild(liM);
-
-    liE.appendChild(checkbox);
-    liE.appendChild(eveningText);
-    eveningList.appendChild(liE);
-  });
-
-  const note = document.getElementById("note");
-  note.value = data.note;
-  note.oninput = e => {
-    data.note = e.target.value;
-    save();
+  prevDayBtn.onclick = () => {
+    const d = addDays(currentDate, -1);
+    loadDataFor(d);
   };
+  nextDayBtn.onclick = () => {
+    const d = addDays(currentDate, 1);
+    loadDataFor(d);
+  };
+
+  datePicker.onchange = e => {
+    const d = new Date(e.target.value + 'T00:00:00');
+    loadDataFor(d);
+  };
+
+  function refreshSavedDates() {
+    const keys = Object.keys(localStorage).filter(k => k.startsWith('daily-')).sort().reverse();
+    savedDatesSelect.innerHTML = '';
+    keys.forEach(k => {
+      const dateStr = k.slice(6);
+      const opt = document.createElement('option');
+      opt.value = dateStr;
+      opt.innerText = dateStr;
+      savedDatesSelect.appendChild(opt);
+    });
+    // add placeholder when empty
+    if (keys.length === 0) {
+      const opt = document.createElement('option');
+      opt.innerText = '(无已保存日期)';
+      opt.value = '';
+      savedDatesSelect.appendChild(opt);
+    }
+  }
+
+  savedDatesSelect.onchange = e => {
+    if (!e.target.value) return;
+    const d = new Date(e.target.value + 'T00:00:00');
+    loadDataFor(d);
+  };
+
+  // init
+  loadDataFor(currentDate);
+  refreshSavedDates();
 </script>
 </body>
 </html>
